@@ -1,0 +1,29 @@
+name: Verification du build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Installer et compiler
+    runs-on: ubuntu-latest
+    env:
+      # Valeurs factices : elles permettent seulement de compiler le client.
+      # Les vraies clés sont configurées dans .env.local au déploiement.
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.signature
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v4
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Installer les dependances
+        run: npm ci
+      - name: Compiler l'application
+        run: npm run build
