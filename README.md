@@ -1,3 +1,18 @@
+# Argent Clair
+
+Application web personnelle de gestion d'argent en FCFA : revenus, dépenses, solde et tableau de bord mensuel.
+
+## Démarrer le MVP
+
+1. Créez un projet sur [Supabase](https://supabase.com), puis exécutez le contenu de `supabase/schema.sql` dans son éditeur SQL.
+2. Copiez `.env.example` en `.env.local` et renseignez l'URL et la clé anonyme de Supabase.
+3. Installez les dépendances avec `npm install`, puis lancez `npm run dev`.
+4. Dans Supabase Auth, configurez l'URL de redirection vers `http://localhost:3000` (et l'URL de production au déploiement).
+
+Les politiques Row Level Security garantissent qu'un utilisateur connecté ne peut accéder qu'à son propre profil et ses propres transactions.
+
+---
+
 # Guide Complet : Créer un Site E-commerce Adapté à l'Afrique
 
 ## Table des matières
