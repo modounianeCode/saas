@@ -17,3 +17,14 @@ export function validatePassword(password: string): string | null {
   if (password.length < 8) return "Le mot de passe doit contenir au moins 8 caractères.";
   return null;
 }
+
+export function validateName(name: string): string | null {
+  if (!name.trim()) return "Le nom est requis.";
+  if (name.length > 120) return "Le nom ne peut pas dépasser 120 caractères.";
+  return null;
+}
+
+export function validateWithdrawal(amount: number, current: number): string | null {
+  if (amount > current) return "Le retrait ne peut pas dépasser le montant épargné.";
+  return null;
+}

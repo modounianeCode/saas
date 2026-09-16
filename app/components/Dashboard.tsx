@@ -7,6 +7,7 @@ import type { TransactionInput } from "@/lib/types";
 import Summary from "./Summary";
 import TransactionForm from "./TransactionForm";
 import TransactionList from "./TransactionList";
+import SavingsGoals from "./SavingsGoals";
 
 export default function Dashboard() {
   const { client, userId } = useAuth();
@@ -60,6 +61,8 @@ export default function Dashboard() {
           <TransactionList transactions={transactions} onRemove={id => remove(id)} />
         </article>
       </section>
+
+      {userId && <SavingsGoals client={client} userId={userId} />}
     </main>
   );
 }

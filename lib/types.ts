@@ -15,6 +15,14 @@ export type TransactionInput = {
   occurred_on: string;
 };
 
+export type SavingsGoal = {
+  id: string;
+  name: string;
+  target_amount: number;
+  current_amount: number;
+  created_at: string;
+};
+
 export const expenseCategories = ["Alimentation", "Transport", "Logement", "Santé", "Loisirs", "Autres"];
 export const incomeCategories = ["Salaire", "Vente", "Cadeau", "Autres"];
 

@@ -10,7 +10,7 @@ Application web personnelle de gestion d'argent en FCFA : revenus, dépenses, so
 
 ## Démarrer le projet
 
-1. Créez un projet sur [Supabase](https://supabase.com), puis exécutez le contenu de `supabase/schema.sql` dans son éditeur SQL.
+1. Créez un projet sur [Supabase](https://supabase.com), puis exécutez le contenu de `supabase/schema.sql` dans son éditeur SQL. Pour une base existante, exécutez plutôt les fichiers de `supabase/migrations/` dans l'ordre.
 2. Copiez `.env.example` en `.env.local` et renseignez l'URL et la clé anonyme de Supabase.
 3. Installez les dépendances : `npm install`
 4. Lancez le serveur de développement : `npm run dev`
@@ -27,11 +27,15 @@ app/
   globals.css         – Styles globaux
 lib/
   supabase.ts         – Client Supabase côté navigateur
+  supabaseServer.ts   – Client Supabase côté serveur (session)
   useAuth.ts          – Hook d'authentification
   useTransactions.ts  – Hook de gestion des transactions
+  useSavings.ts       – Hook de gestion des objectifs d'épargne
   validation.ts       – Validation côté client
+  types.ts            – Types partagés
 supabase/
-  schema.sql          – Schéma de la base de données
+  schema.sql          – Schéma complet (installations neuves)
+  migrations/         – Migrations pour bases déjà déployées
 ```
 
 ## Fonctionnalités
@@ -41,6 +45,7 @@ supabase/
 - Catégories prédéfinies (Alimentation, Transport, Logement, etc.)
 - Tableau de bord mensuel : solde actuel, revenus et dépenses du mois
 - Solde initial modifiable
+- Objectifs d'épargne : création, dépôts/retraits dédiés, barre de progression
 - Sécurité RLS : chaque utilisateur ne voit que ses propres données
 
 ## Déploiement
