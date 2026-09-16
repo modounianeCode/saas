@@ -12,7 +12,6 @@ create table public.transactions (
   user_id uuid not null references auth.users(id) on delete cascade,
   type public.transaction_type not null,
   amount bigint not null check (amount > 0),
-  label text not null check (char_length(label) between 1 and 120),
   category text not null,
   occurred_on date not null default current_date,
   created_at timestamptz not null default now()
@@ -21,8 +20,11 @@ create table public.transactions (
 alter table public.profiles enable row level security;
 alter table public.transactions enable row level security;
 
-create policy "Own profile only" on public.profiles for all using (auth.uid() = id) with check (auth.uid() = id);
-create policy "Own transactions only" on public.transactions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Own profile only" on public.profiles
+  for all using (auth.uid() = id) with check (auth.uid() = id);
+
+create policy "Own transactions only" on public.transactions
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create or replace function public.create_profile_for_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -31,4 +33,7 @@ begin
   return new;
 end;
 $$;
-create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.create_profile_for_new_user();
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.create_profile_for_new_user();
