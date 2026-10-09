@@ -20,19 +20,26 @@ Application web personnelle de gestion d'argent en FCFA : revenus, dépenses, so
 
 ```
 app/
-  components/         – Composants UI réutilisables
-  (auth)/             – Page d'authentification (login/signup/reset)
-  (dashboard)/        – Tableau de bord principal
+  components/         – Composants UI réutilisables (dont OfflineProvider)
+  login/              – Page d'authentification (connexion/inscription)
+  dashboard/          – Tableau de bord principal
   layout.tsx          – Layout racine
   globals.css         – Styles globaux
+  manifest.ts         – Manifest PWA
 lib/
   supabase.ts         – Client Supabase côté navigateur
   supabaseServer.ts   – Client Supabase côté serveur (session)
   useAuth.ts          – Hook d'authentification
   useTransactions.ts  – Hook de gestion des transactions
   useSavings.ts       – Hook de gestion des objectifs d'épargne
+  useOnline.ts        – État de la connexion (en ligne / hors ligne)
+  offlineSync.ts      – Cache, file d'attente des écritures et synchronisation
+  db.ts               – Accès IndexedDB (persistance locale)
   validation.ts       – Validation côté client
   types.ts            – Types partagés
+public/
+  sw.js               – Service worker (cache des scripts, repli hors ligne)
+  icon.svg            – Icône PWA
 supabase/
   schema.sql          – Schéma complet (installations neuves)
   migrations/         – Migrations pour bases déjà déployées
@@ -47,6 +54,7 @@ supabase/
 - Solde initial modifiable
 - Objectifs d'épargne : création, dépôts/retraits dédiés, barre de progression
 - Sécurité RLS : chaque utilisateur ne voit que ses propres données
+- **Mode hors ligne** : PWA installable ; hors connexion, l'app reste lisible et les modifications sont mises en file d'attente puis synchronisées au retour du réseau (bannière « Hors ligne » / compteur « à synchroniser »). Les données sont mises en cache localement dans le navigateur (IndexedDB + service worker).
 
 ## Déploiement
 
