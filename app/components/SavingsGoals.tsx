@@ -33,7 +33,7 @@ export default function SavingsGoals({ client, userId }: Props) {
         <div className="savings-grid">
           {goals.map(goal => (
             <SavingsGoalCard
-              key={goal.id}
+              key={goal.client_id}
               goal={goal}
               onDeposit={deposit}
               onWithdraw={withdraw}

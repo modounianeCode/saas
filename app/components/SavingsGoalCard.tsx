@@ -5,7 +5,7 @@ type Props = {
   goal: SavingsGoal;
   onDeposit: (goal: SavingsGoal, amount: string) => Promise<string | null>;
   onWithdraw: (goal: SavingsGoal, amount: string) => Promise<string | null>;
-  onRemove: (id: string) => void;
+  onRemove: (clientId: string) => void;
 };
 
 export default function SavingsGoalCard({ goal, onDeposit, onWithdraw, onRemove }: Props) {
@@ -37,7 +37,7 @@ export default function SavingsGoalCard({ goal, onDeposit, onWithdraw, onRemove 
         </div>
         <button
           className="link danger"
-          onClick={() => { if (confirm(`Supprimer l'objectif « ${goal.name} » ?`)) onRemove(goal.id); }}
+          onClick={() => { if (confirm(`Supprimer l'objectif « ${goal.name} » ?`)) onRemove(goal.client_id); }}
         >
           Supprimer
         </button>

@@ -2,7 +2,7 @@ import { money, type Transaction } from "@/lib/types";
 
 type Props = {
   transactions: Transaction[];
-  onRemove: (id: string) => void;
+  onRemove: (clientId: string) => void;
 };
 
 export default function TransactionList({ transactions, onRemove }: Props) {
@@ -13,7 +13,7 @@ export default function TransactionList({ transactions, onRemove }: Props) {
   return (
     <>
       {transactions.slice(0, 8).map(t => (
-        <div className="transaction" key={t.id}>
+        <div className="transaction" key={t.client_id}>
           <span className={`icon ${t.type}`}>{t.type === "income" ? "↗" : "↘"}</span>
           <div>
             <b>{t.category}</b>
@@ -22,7 +22,7 @@ export default function TransactionList({ transactions, onRemove }: Props) {
           <strong className={t.type}>{t.type === "income" ? "+" : "−"}{money.format(t.amount)}</strong>
           <button
             aria-label="Supprimer"
-            onClick={() => { if (confirm("Supprimer cette transaction ?")) onRemove(t.id); }}
+            onClick={() => { if (confirm("Supprimer cette transaction ?")) onRemove(t.client_id); }}
           >
             ×
           </button>

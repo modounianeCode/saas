@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Transaction, TransactionInput } from "./types";
+import { newClientId } from "./types";
 import { validateAmount } from "./validation";
 import { cacheGet, cacheSet, enqueueOp } from "./offlineSync";
 
@@ -18,7 +19,7 @@ export function useTransactions(client: SupabaseClient, userId: string) {
       const [{ data: items, error: itemsError }, { data: profile, error: profileError }] = await Promise.all([
         client
           .from("transactions")
-          .select("id,type,amount,category,occurred_on")
+          .select("id,client_id,type,amount,category,occurred_on")
           .order("occurred_on", { ascending: false }),
         client.from("profiles").select("opening_balance").eq("id", userId).maybeSingle(),
       ]);
@@ -55,8 +56,10 @@ export function useTransactions(client: SupabaseClient, userId: string) {
     const amountError = validateAmount(input.amount);
     if (amountError) return amountError;
 
+    const clientId = newClientId();
     const transaction: Transaction = {
-      id: `local-${Date.now()}`,
+      id: clientId,
+      client_id: clientId,
       type: input.type,
       amount: Math.round(Number(input.amount)),
       category: input.category,
@@ -65,6 +68,7 @@ export function useTransactions(client: SupabaseClient, userId: string) {
     updateLocal(prev => [transaction, ...prev]);
 
     const { error } = await client.from("transactions").insert({
+      client_id: clientId,
       user_id: userId,
       type: transaction.type,
       amount: transaction.amount,
@@ -73,6 +77,7 @@ export function useTransactions(client: SupabaseClient, userId: string) {
     });
     if (error) {
       await enqueueOp("insert_transaction", {
+        client_id: clientId,
         type: transaction.type,
         amount: transaction.amount,
         category: transaction.category,
@@ -84,11 +89,11 @@ export function useTransactions(client: SupabaseClient, userId: string) {
     return null;
   }
 
-  async function remove(id: string) {
-    updateLocal(prev => prev.filter(t => t.id !== id));
-    const { error } = await client.from("transactions").delete().eq("id", id);
+  async function remove(clientId: string) {
+    updateLocal(prev => prev.filter(t => t.client_id !== clientId));
+    const { error } = await client.from("transactions").delete().eq("client_id", clientId);
     if (error) {
-      await enqueueOp("delete_transaction", { id });
+      await enqueueOp("delete_transaction", { client_id: clientId });
       return;
     }
     await refresh();

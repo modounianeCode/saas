@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SavingsGoal } from "./types";
+import { newClientId } from "./types";
 import { validateAmount, validateName, validateWithdrawal } from "./validation";
 import { cacheGet, cacheSet, enqueueOp } from "./offlineSync";
 
@@ -49,8 +50,10 @@ export function useSavings(client: SupabaseClient, userId: string) {
     if (targetError) return targetError;
     const target = Math.round(Number(targetRaw));
 
+    const clientId = newClientId();
     const goal: SavingsGoal = {
-      id: `local-${Date.now()}`,
+      id: clientId,
+      client_id: clientId,
       name: name.trim(),
       target_amount: target,
       current_amount: 0,
@@ -59,12 +62,13 @@ export function useSavings(client: SupabaseClient, userId: string) {
     updateLocal(prev => [...prev, goal]);
 
     const { error } = await client.from("savings_goals").insert({
+      client_id: clientId,
       user_id: userId,
       name: goal.name,
       target_amount: target,
     });
     if (error) {
-      await enqueueOp("insert_goal", { name: goal.name, target_amount: target });
+      await enqueueOp("insert_goal", { client_id: clientId, name: goal.name, target_amount: target });
       return null;
     }
     await refresh();
@@ -77,16 +81,21 @@ export function useSavings(client: SupabaseClient, userId: string) {
     );
   }
 
-  async function adjustOfflineOrNetwork(goal: SavingsGoal, delta: number) {
+  async function adjustOfflineOrNetwork(goal: SavingsGoal, delta: number): Promise<string | null> {
     const next = goal.current_amount + delta;
     if (next < 0) return "Le retrait ne peut pas dépasser le montant épargné.";
     applyAdjustment(goal, Math.max(0, next));
-    const { error } = await client
-      .from("savings_goals")
-      .update({ current_amount: Math.max(0, next) })
-      .eq("id", goal.id);
+
+    // Même op_id pour la tentative réseau et l'éventuel rejeu : la RPC
+    // `adjust_goal` est idempotente, un double appel est inoffensif.
+    const opId = newClientId();
+    const { error } = await client.rpc("adjust_goal", {
+      p_client_id: goal.client_id,
+      p_delta: delta,
+      p_op_id: opId,
+    });
     if (error) {
-      await enqueueOp("adjust_goal", { goal_id: goal.id, delta });
+      await enqueueOp("adjust_goal", { goal_client_id: goal.client_id, delta, op_id: opId });
       return null;
     }
     await refresh();
@@ -109,11 +118,11 @@ export function useSavings(client: SupabaseClient, userId: string) {
     return adjustOfflineOrNetwork(goal, -amount);
   }
 
-  async function remove(id: string) {
-    updateLocal(prev => prev.filter(g => g.id !== id));
-    const { error } = await client.from("savings_goals").delete().eq("id", id);
+  async function remove(clientId: string) {
+    updateLocal(prev => prev.filter(g => g.client_id !== clientId));
+    const { error } = await client.from("savings_goals").delete().eq("client_id", clientId);
     if (error) {
-      await enqueueOp("delete_goal", { id });
+      await enqueueOp("delete_goal", { client_id: clientId });
       return;
     }
     await refresh();

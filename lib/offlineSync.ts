@@ -22,35 +22,40 @@ export function notifyOutboxChanged() {
 // que `syncNow` sache qu'il faut conserver l'opération dans l'outbox.
 async function replay(client: SupabaseClient, userId: string, op: OutboxOp): Promise<void> {
   switch (op.type) {
+    // Les inserts sont rejoués en upsert ignoreDuplicates : si l'opération
+    // réseau initiale avait en réalité réussi (réponse perdue), le double
+    // rejeu est inoffensif grâce à l'unicité de client_id.
     case "insert_transaction": {
-      const { error } = await client.from("transactions").insert({ user_id: userId, ...op.payload });
+      const { error } = await client
+        .from("transactions")
+        .upsert({ user_id: userId, ...op.payload }, { onConflict: "client_id", ignoreDuplicates: true });
       if (error) throw error;
       return;
     }
     case "delete_transaction": {
-      const { error } = await client.from("transactions").delete().eq("id", String(op.payload.id));
+      const { error } = await client.from("transactions").delete().eq("client_id", String(op.payload.client_id));
       if (error) throw error;
       return;
     }
     case "insert_goal": {
-      const { error } = await client.from("savings_goals").insert({ user_id: userId, ...op.payload });
+      const { error } = await client
+        .from("savings_goals")
+        .upsert({ user_id: userId, ...op.payload }, { onConflict: "client_id", ignoreDuplicates: true });
       if (error) throw error;
       return;
     }
     case "adjust_goal": {
-      const { data, error: readError } = await client
-        .from("savings_goals")
-        .select("current_amount")
-        .eq("id", String(op.payload.goal_id))
-        .maybeSingle();
-      if (readError) throw readError;
-      const current = Math.max(0, Number(data?.current_amount ?? 0) + Number(op.payload.delta));
-      const { error } = await client.from("savings_goals").update({ current_amount: current }).eq("id", String(op.payload.goal_id));
+      // RPC atomique et idempotente côté SQL (delta + op_id journalisé).
+      const { error } = await client.rpc("adjust_goal", {
+        p_client_id: String(op.payload.goal_client_id),
+        p_delta: Number(op.payload.delta),
+        p_op_id: String(op.payload.op_id),
+      });
       if (error) throw error;
       return;
     }
     case "delete_goal": {
-      const { error } = await client.from("savings_goals").delete().eq("id", String(op.payload.id));
+      const { error } = await client.from("savings_goals").delete().eq("client_id", String(op.payload.client_id));
       if (error) throw error;
       return;
     }
@@ -69,21 +74,31 @@ export async function enqueueOp(type: string, payload: Record<string, unknown>):
   notifyOutboxChanged();
 }
 
-export async function syncNow(client: SupabaseClient): Promise<{ synced: number; pending: number }> {
-  const session = await cacheGet<{ id?: string }>("session_user");
-  if (!session?.id) return { synced: 0, pending: await outboxCount() };
+// Verrou simple : empêche deux syncNow simultanés (montage + event
+// `online`, ou deux onglets du même module) de rejouer l'outbox en parallèle.
+let isSyncing = false;
 
-  const ops = await outboxAll();
-  let synced = 0;
-  for (const op of ops) {
-    try {
-      await replay(client, session.id, op);
-      if (op.id) await outboxRemove(op.id);
-      synced += 1;
-    } catch {
-      break;
+export async function syncNow(client: SupabaseClient): Promise<{ synced: number; pending: number }> {
+  if (isSyncing) return { synced: 0, pending: await outboxCount() };
+  isSyncing = true;
+  try {
+    const session = await cacheGet<{ id?: string }>("session_user");
+    if (!session?.id) return { synced: 0, pending: await outboxCount() };
+
+    const ops = await outboxAll();
+    let synced = 0;
+    for (const op of ops) {
+      try {
+        await replay(client, session.id, op);
+        if (op.id) await outboxRemove(op.id);
+        synced += 1;
+      } catch {
+        break;
+      }
     }
+    notifyOutboxChanged();
+    return { synced, pending: await outboxCount() };
+  } finally {
+    isSyncing = false;
   }
-  notifyOutboxChanged();
-  return { synced, pending: await outboxCount() };
 }
