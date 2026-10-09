@@ -3,7 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { validateEmail, validatePassword } from "@/lib/validation";
+import { validateEmail, validateName, validatePassword } from "@/lib/validation";
 
 type Mode = "login" | "signup" | "reset";
 
@@ -13,6 +13,7 @@ export default function AuthForm() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [notice, setNotice] = useState<{ type: "error" | "success"; text: string } | null>(null);
 
   async function submitAuth(event: FormEvent) {
@@ -25,6 +26,10 @@ export default function AuthForm() {
       const passwordError = validatePassword(password);
       if (passwordError) return setNotice({ type: "error", text: passwordError });
     }
+    if (mode === "signup") {
+      const nameError = validateName(fullName);
+      if (nameError) return setNotice({ type: "error", text: nameError });
+    }
 
     if (mode === "reset") {
       const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/` });
@@ -36,7 +41,7 @@ export default function AuthForm() {
 
     const { error } = mode === "login"
       ? await client.auth.signInWithPassword({ email, password })
-      : await client.auth.signUp({ email, password, options: { emailRedirectTo: `${location.origin}/` } });
+      : await client.auth.signUp({ email, password, options: { data: { full_name: fullName }, emailRedirectTo: `${location.origin}/` } });
 
     if (error) return setNotice({ type: "error", text: error.message });
     if (mode === "signup") {
@@ -53,6 +58,16 @@ export default function AuthForm() {
         <h1>Votre argent,<br />simplement.</h1>
         <p>Suivez chaque dépense. Gardez le contrôle.</p>
         <form onSubmit={submitAuth} className="stack" noValidate>
+          {mode === "signup" && (
+            <input
+              aria-label="Nom complet"
+              type="text"
+              placeholder="Nom complet"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              required
+            />
+          )}
           <input
             aria-label="E-mail"
             type="email"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { useTransactions } from "@/lib/useTransactions";
 import type { TransactionInput } from "@/lib/types";
@@ -10,7 +11,8 @@ import TransactionList from "./TransactionList";
 import SavingsGoals from "./SavingsGoals";
 
 export default function Dashboard() {
-  const { client, userId } = useAuth();
+  const router = useRouter();
+  const { client, userId, fullName } = useAuth();
   const { transactions, openingBalance, add, remove, saveOpeningBalance } = useTransactions(client, userId ?? "");
 
   const month = useMemo(() => {
@@ -31,12 +33,12 @@ export default function Dashboard() {
     <main className="app-shell">
       <header>
         <div className="brand"><span>✦</span> Argent Clair</div>
-        <button className="logout" onClick={() => client.auth.signOut()}>Déconnexion</button>
+        <button className="logout" onClick={() => client.auth.signOut().then(() => router.push("/login"))}>Déconnexion</button>
       </header>
 
       <section className="welcome">
         <div>
-          <p>Bonjour 👋</p>
+          <p>Assalaamu alaykum{fullName ? `, ${fullName}` : ""} 👋</p>
           <h1>Voici votre situation.</h1>
         </div>
         <label className="opening">
