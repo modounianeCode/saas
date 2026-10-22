@@ -64,9 +64,11 @@ La CI GitHub Actions exécute ces trois contrôles puis `npm run build` sur chaq
 ## Fonctionnalités
 
 - Authentification (connexion, inscription, réinitialisation du mot de passe via lien e-mail)
-- Ajout et suppression de transactions (revenus / dépenses)
+- Ajout, modification et suppression réversible des transactions (revenus / dépenses)
+- Historique complet : filtres par mois, type et catégorie, affichage progressif (20 par page)
+- Suppression avec « Annuler » (soft delete, 6 secondes)
+- Résumé mensuel synchronisé avec le mois sélectionné
 - Catégories prédéfinies (Alimentation, Transport, Logement, etc.)
-- Tableau de bord mensuel : solde actuel, revenus et dépenses du mois
 - Solde initial modifiable
 - Objectifs d'épargne : création, dépôts/retraits dédiés, barre de progression
 - Sécurité RLS : chaque utilisateur ne voit que ses propres données

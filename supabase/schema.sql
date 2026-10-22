@@ -15,7 +15,8 @@ create table public.transactions (
   amount bigint not null check (amount > 0),
   category text not null,
   occurred_on date not null default current_date,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
 );
 
 alter table public.profiles enable row level security;
@@ -45,6 +46,9 @@ create policy "Own savings goals only" on public.savings_goals
 -- Index de lecture (filtre par user_id + tri par date).
 create index transactions_user_occurred_idx
   on public.transactions (user_id, occurred_on desc, created_at desc);
+create index transactions_user_live_idx
+  on public.transactions (user_id, occurred_on desc, created_at desc)
+  where deleted_at is null;
 create index savings_goals_user_created_idx
   on public.savings_goals (user_id, created_at);
 

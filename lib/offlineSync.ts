@@ -64,7 +64,32 @@ async function replay(client: SupabaseClient, userId: string, op: OutboxOp): Pro
       return;
     }
     case "delete_transaction": {
-      const { error } = await client.from("transactions").delete().eq("client_id", String(op.payload.client_id));
+      // Suppression douce : la ligne reste pour permettre l'annulation.
+      const { error } = await client
+        .from("transactions")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("client_id", String(op.payload.client_id));
+      if (error) throw error;
+      return;
+    }
+    case "restore_transaction": {
+      const { error } = await client
+        .from("transactions")
+        .update({ deleted_at: null })
+        .eq("client_id", String(op.payload.client_id));
+      if (error) throw error;
+      return;
+    }
+    case "update_transaction": {
+      const { error } = await client
+        .from("transactions")
+        .update({
+          type: op.payload.type,
+          amount: Number(op.payload.amount),
+          category: String(op.payload.category),
+          occurred_on: String(op.payload.occurred_on),
+        })
+        .eq("client_id", String(op.payload.client_id));
       if (error) throw error;
       return;
     }

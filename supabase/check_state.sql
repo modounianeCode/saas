@@ -8,7 +8,8 @@ from pg_tables
 where schemaname = 'public'
 order by 1;
 
--- 2. Colonnes clés (client_id doit exister sur transactions ET savings_goals)
+-- 2. Colonnes clés (client_id doit exister sur transactions ET savings_goals ;
+--    deleted_at sur transactions = migration 005 appliquée)
 select c.relname as table_name,
        a.attname as column_name,
        format_type(a.atttypid, a.atttypmod) as data_type,
@@ -18,7 +19,7 @@ join pg_class c on c.oid = a.attrelid
 join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public'
   and c.relname in ('profiles', 'transactions', 'savings_goals', 'applied_ops')
-  and a.attname in ('client_id', 'opening_balance')
+  and a.attname in ('client_id', 'opening_balance', 'deleted_at')
   and a.attnum > 0
 order by 1, 2;
 

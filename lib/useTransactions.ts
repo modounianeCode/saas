@@ -12,6 +12,14 @@ const profileKey = (userId: string) => `profile:${userId}`;
 const PAGE_SIZE = 1000;
 const MAX_PAGES = 20;
 
+/** Tri identique à celui du serveur (date décroissante, puis création). */
+function sortTransactions(list: Transaction[]): Transaction[] {
+  return [...list].sort((a, b) => {
+    if (a.occurred_on !== b.occurred_on) return a.occurred_on < b.occurred_on ? 1 : -1;
+    return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+  });
+}
+
 export function useTransactions(client: SupabaseClient, userId: string | null) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
@@ -27,6 +35,7 @@ export function useTransactions(client: SupabaseClient, userId: string | null) {
         const { data, error } = await client
           .from("transactions")
           .select("id,client_id,type,amount,category,occurred_on,created_at")
+          .is("deleted_at", null)
           .order("occurred_on", { ascending: false })
           .order("created_at", { ascending: false })
           .range(from, from + PAGE_SIZE - 1);
@@ -85,7 +94,7 @@ export function useTransactions(client: SupabaseClient, userId: string | null) {
       category: input.category,
       occurred_on: input.occurred_on,
     };
-    updateLocal(prev => [transaction, ...prev]);
+    updateLocal(prev => sortTransactions([transaction, ...prev]));
 
     const { error } = await client.from("transactions").insert({
       client_id: clientId,
@@ -113,12 +122,61 @@ export function useTransactions(client: SupabaseClient, userId: string | null) {
     return null;
   }
 
+  /** Modification optimiste. Les écritures hors ligne sont rejouées telles
+   *  quelles : la ligne peut avoir été créée par une opération déjà en file. */
+  async function update(clientId: string, input: TransactionInput): Promise<string | null> {
+    if (!userId) return "Vous devez être connecté.";
+    const amountError = validateAmount(input.amount);
+    if (amountError) return amountError;
+
+    const patch = {
+      type: input.type,
+      amount: Math.round(Number(input.amount)),
+      category: input.category,
+      occurred_on: input.occurred_on,
+    };
+    updateLocal(prev =>
+      sortTransactions(prev.map(t => (t.client_id === clientId ? { ...t, ...patch } : t)))
+    );
+
+    const { error } = await client.from("transactions").update(patch).eq("client_id", clientId);
+    if (error) {
+      await enqueueOp("update_transaction", { client_id: clientId, ...patch }, userId);
+      return null;
+    }
+    await refresh();
+    return null;
+  }
+
+  /** Suppression douce : la ligne est marquée côté base et peut être restaurée. */
   async function remove(clientId: string) {
     if (!userId) return;
     updateLocal(prev => prev.filter(t => t.client_id !== clientId));
-    const { error } = await client.from("transactions").delete().eq("client_id", clientId);
+    const { error } = await client
+      .from("transactions")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("client_id", clientId);
     if (error) {
       await enqueueOp("delete_transaction", { client_id: clientId }, userId);
+      return;
+    }
+    await refresh();
+  }
+
+  /** Annulation d'une suppression (réseau ou file hors ligne). */
+  async function restore(transaction: Transaction) {
+    if (!userId) return;
+    updateLocal(prev =>
+      prev.some(t => t.client_id === transaction.client_id)
+        ? prev
+        : sortTransactions([transaction, ...prev])
+    );
+    const { error } = await client
+      .from("transactions")
+      .update({ deleted_at: null })
+      .eq("client_id", transaction.client_id);
+    if (error) {
+      await enqueueOp("restore_transaction", { client_id: transaction.client_id }, userId);
       return;
     }
     await refresh();
@@ -138,5 +196,5 @@ export function useTransactions(client: SupabaseClient, userId: string | null) {
     return null;
   }
 
-  return { transactions, openingBalance, add, remove, saveOpeningBalance };
+  return { transactions, openingBalance, add, update, remove, restore, saveOpeningBalance };
 }

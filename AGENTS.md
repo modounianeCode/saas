@@ -56,6 +56,10 @@ public/
 
 **Auth emails (PKCE)**: `@supabase/ssr` forces `flowType: "pkce"`. Every `emailRedirectTo` / `redirectTo` must point to `/auth/callback?next=...`, which exchanges the code for a session (`exchangeCodeForSession`). There is no implicit-flow hash handling.
 
+**Outbox op types**: `insert_transaction`, `update_transaction`, `delete_transaction` (soft delete), `restore_transaction`, `insert_goal`, `adjust_goal`, `delete_goal`, `update_profile`. A new type requires a `replay()` case, otherwise it is dropped as a permanent error.
+
+**Transaction history**: `TransactionList` filters by month (the Dashboard owns the `period` state so the Summary follows it), type and category, and paginates client-side (20 rows). Deletion is **soft** (`deleted_at`, migration 005) and reversible for 6 s via the undo toast; `restore()` clears the flag. `TransactionEditor` handles inline edits. All reads filter `deleted_at is null`.
+
 **Offline-First Data Flow**:
 1. Optimistic UI update → `updateLocal()` → cache to IndexedDB
 2. Try network write → on success: `refresh()` from server
@@ -89,7 +93,7 @@ Copy from `.env.example` (not committed).
 ## Database Setup
 1. Create a Supabase project
 2. Run `supabase/schema.sql` in the SQL editor (fresh install **only**)
-3. For an existing DB: run `supabase/check_state.sql` (read-only diagnostic), then migrations in order (`001_*` → `002_*` → `003_*` → `004_*`). Migrations are idempotent and safe to re-run after a partial failure.
+3. For an existing DB: run `supabase/check_state.sql` (read-only diagnostic), then migrations in order (`001_*` → `002_*` → `003_*` → `004_*` → `005_*`). Migrations are idempotent and safe to re-run after a partial failure.
 4. Configure Auth redirect URLs: `http://localhost:3000/auth/callback` (dev), `https://<domain>/auth/callback` (prod)
 
 > `42703: column "client_id" does not exist` means migration `003` was never applied (it adds the offline idempotency key). Run `003` before `004`.
@@ -112,10 +116,11 @@ No automated test suite. Manual verification steps:
 1. `npm run dev` → open localhost:3000
 2. Sign up → verify email → login (the email link must go through `/auth/callback`)
 3. Add transactions (income/expense), verify dashboard totals
-4. Create savings goal, deposit/withdraw
-5. Disconnect network → make changes → reconnect → verify sync banner appears and data persists
-6. Sign up as a second user → check that the first user's queued operations are not replayed
-7. Reset password → link opens `/reset-password` → set a new password
+4. Filter the history by month/type/category, edit a transaction, delete one and press “Annuler”
+5. Create savings goal, deposit/withdraw
+6. Disconnect network → make changes (add, edit, delete, undo) → reconnect → verify sync banner appears and data persists
+7. Sign up as a second user → check that the first user's queued operations are not replayed
+8. Reset password → link opens `/reset-password` → set a new password
 
 ## Common Gotchas
 - **Amounts stored as bigint (FCFA integers)** — validation enforces positive integers

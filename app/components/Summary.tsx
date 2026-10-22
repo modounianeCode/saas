@@ -4,9 +4,10 @@ type Props = {
   balance: number;
   income: number;
   expenses: number;
+  periodLabel: string;
 };
 
-export default function Summary({ balance, income, expenses }: Props) {
+export default function Summary({ balance, income, expenses, periodLabel }: Props) {
   return (
     <section className="summary">
       <article className="balance">
@@ -15,11 +16,11 @@ export default function Summary({ balance, income, expenses }: Props) {
         <span>Votre solde disponible</span>
       </article>
       <article className="income">
-        <small>REVENUS CE MOIS</small>
+        <small>REVENUS · {periodLabel}</small>
         <strong>+ {money.format(income)}</strong>
       </article>
       <article className="expense">
-        <small>DÉPENSES CE MOIS</small>
+        <small>DÉPENSES · {periodLabel}</small>
         <strong>− {money.format(expenses)}</strong>
       </article>
     </section>
