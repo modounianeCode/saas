@@ -3,7 +3,7 @@ create type public.transaction_type as enum ('income', 'expense');
 
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  opening_balance bigint not null default 0,
+  opening_balance bigint not null default 0 check (opening_balance >= 0),
   created_at timestamptz not null default now()
 );
 
@@ -41,6 +41,12 @@ alter table public.savings_goals enable row level security;
 
 create policy "Own savings goals only" on public.savings_goals
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Index de lecture (filtre par user_id + tri par date).
+create index transactions_user_occurred_idx
+  on public.transactions (user_id, occurred_on desc, created_at desc);
+create index savings_goals_user_created_idx
+  on public.savings_goals (user_id, created_at);
 
 create or replace function public.create_profile_for_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$

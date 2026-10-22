@@ -9,7 +9,8 @@ type Props = {
 };
 
 export default function SavingsGoalCard({ goal, onDeposit, onWithdraw, onRemove }: Props) {
-  const [amount, setAmount] = useState("");
+  const [deposit, setDeposit] = useState("");
+  const [withdraw, setWithdraw] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const progress = goal.target_amount > 0
@@ -17,15 +18,26 @@ export default function SavingsGoalCard({ goal, onDeposit, onWithdraw, onRemove 
     : 0;
   const done = goal.current_amount >= goal.target_amount;
 
-  function submit(handler: (goal: SavingsGoal, amount: string) => Promise<string | null>) {
+  function submit(
+    handler: (goal: SavingsGoal, amount: string) => Promise<string | null>,
+    amount: string,
+    reset: () => void
+  ) {
     return (event: FormEvent) => {
       event.preventDefault();
       void handler(goal, amount).then(message => {
         if (message) return setError(message);
         setError(null);
-        setAmount("");
+        reset();
       });
     };
+  }
+
+  function confirmRemoval() {
+    const warning = goal.current_amount > 0
+      ? `Supprimer l'objectif « ${goal.name} » ? Les ${money.format(goal.current_amount)} épargnés seront perdus.`
+      : `Supprimer l'objectif « ${goal.name} » ?`;
+    if (confirm(warning)) onRemove(goal.client_id);
   }
 
   return (
@@ -35,10 +47,7 @@ export default function SavingsGoalCard({ goal, onDeposit, onWithdraw, onRemove 
           <h3>{goal.name}</h3>
           <span className="goal-target">Objectif : {money.format(goal.target_amount)}</span>
         </div>
-        <button
-          className="link danger"
-          onClick={() => { if (confirm(`Supprimer l'objectif « ${goal.name} » ?`)) onRemove(goal.client_id); }}
-        >
+        <button className="link danger" onClick={confirmRemoval}>
           Supprimer
         </button>
       </div>
@@ -51,28 +60,28 @@ export default function SavingsGoalCard({ goal, onDeposit, onWithdraw, onRemove 
         <span>{progress}%{done && " · Atteint 🎉"}</span>
       </div>
 
-      <form className="goal-actions" onSubmit={submit(onDeposit)} noValidate>
+      <form className="goal-actions" onSubmit={submit(onDeposit, deposit, () => setDeposit(""))} noValidate>
         <input
-          aria-label="Montant"
+          aria-label="Montant à déposer"
           type="number"
           min="1"
           step="1"
           placeholder="Montant (FCFA)"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
+          value={deposit}
+          onChange={e => setDeposit(e.target.value)}
           required
         />
         <button className="small" type="submit">Déposer</button>
       </form>
-      <form className="goal-actions" onSubmit={submit(onWithdraw)} noValidate>
+      <form className="goal-actions" onSubmit={submit(onWithdraw, withdraw, () => setWithdraw(""))} noValidate>
         <input
           aria-label="Montant à retirer"
           type="number"
           min="1"
           step="1"
           placeholder="Montant à retirer (FCFA)"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
+          value={withdraw}
+          onChange={e => setWithdraw(e.target.value)}
           required
         />
         <button className="small withdraw" type="submit">Retirer</button>

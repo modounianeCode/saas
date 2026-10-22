@@ -13,6 +13,7 @@ export function useSavings(client: SupabaseClient, userId: string) {
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
 
   const refresh = useCallback(async () => {
+    if (!userId) return;
     try {
       const { data, error } = await client
         .from("savings_goals")
@@ -44,6 +45,7 @@ export function useSavings(client: SupabaseClient, userId: string) {
   }
 
   async function create(name: string, targetRaw: string): Promise<string | null> {
+    if (!userId) return "Vous devez être connecté.";
     const nameError = validateName(name);
     if (nameError) return nameError;
     const targetError = validateAmount(targetRaw);
@@ -68,23 +70,28 @@ export function useSavings(client: SupabaseClient, userId: string) {
       target_amount: target,
     });
     if (error) {
-      await enqueueOp("insert_goal", { client_id: clientId, name: goal.name, target_amount: target });
+      await enqueueOp("insert_goal", { client_id: clientId, name: goal.name, target_amount: target }, userId);
       return null;
     }
     await refresh();
     return null;
   }
 
-  function applyAdjustment(goal: SavingsGoal, nextAmount: number) {
+  function applyAdjustment(goal: SavingsGoal, delta: number) {
+    // Delta appliqué sur l'état courant (et non sur la prop, potentiellement
+    // périmée si deux dépôts s'enchaînent avant le refresh).
     updateLocal(prev =>
-      prev.map(g => (g.id === goal.id ? { ...g, current_amount: nextAmount } : g))
+      prev.map(g =>
+        g.id === goal.id ? { ...g, current_amount: Math.max(0, g.current_amount + delta) } : g
+      )
     );
   }
 
   async function adjustOfflineOrNetwork(goal: SavingsGoal, delta: number): Promise<string | null> {
+    if (!userId) return "Vous devez être connecté.";
     const next = goal.current_amount + delta;
     if (next < 0) return "Le retrait ne peut pas dépasser le montant épargné.";
-    applyAdjustment(goal, Math.max(0, next));
+    applyAdjustment(goal, delta);
 
     // Même op_id pour la tentative réseau et l'éventuel rejeu : la RPC
     // `adjust_goal` est idempotente, un double appel est inoffensif.
@@ -95,7 +102,7 @@ export function useSavings(client: SupabaseClient, userId: string) {
       p_op_id: opId,
     });
     if (error) {
-      await enqueueOp("adjust_goal", { goal_client_id: goal.client_id, delta, op_id: opId });
+      await enqueueOp("adjust_goal", { goal_client_id: goal.client_id, delta, op_id: opId }, userId);
       return null;
     }
     await refresh();
@@ -119,10 +126,11 @@ export function useSavings(client: SupabaseClient, userId: string) {
   }
 
   async function remove(clientId: string) {
+    if (!userId) return;
     updateLocal(prev => prev.filter(g => g.client_id !== clientId));
     const { error } = await client.from("savings_goals").delete().eq("client_id", clientId);
     if (error) {
-      await enqueueOp("delete_goal", { client_id: clientId });
+      await enqueueOp("delete_goal", { client_id: clientId }, userId);
       return;
     }
     await refresh();

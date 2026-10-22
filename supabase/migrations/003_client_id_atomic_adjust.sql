@@ -1,23 +1,55 @@
 -- 003 : idempotence + atomicité des opérations hors ligne.
--- À exécuter dans l'éditeur SQL de Supabase (ou `supabase db push`).
+-- Idempotent : peut être rejoué sans erreur, y compris sur une base où la
+-- migration avait été partiellement appliquée.
 
--- 1. Clé d'idempotence générée côté client (remplace les ids `local-*`
---    qui n'existaient pas côté serveur lors du rejeu de l'outbox).
-alter table public.transactions
-  add column client_id uuid not null default gen_random_uuid(),
-  add constraint transactions_client_id_key unique (client_id);
+-- 1. Clé d'idempotence générée côté client (remplace les ids `local-*` qui
+--    n'existaient pas côté serveur lors du rejeu de l'outbox).
+--    Ajout en plusieurs étapes : la colonne peut déjà exister avec ou sans
+--    contrainte, et des lignes anciennes n'ont pas de valeur.
+alter table public.transactions add column if not exists client_id uuid;
+update public.transactions set client_id = gen_random_uuid() where client_id is null;
+alter table public.transactions alter column client_id set default gen_random_uuid();
+alter table public.transactions alter column client_id set not null;
 
-alter table public.savings_goals
-  add column client_id uuid not null default gen_random_uuid(),
-  add constraint savings_goals_client_id_key unique (client_id);
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.transactions'::regclass
+      and conname = 'transactions_client_id_key'
+  ) then
+    alter table public.transactions
+      add constraint transactions_client_id_key unique (client_id);
+  end if;
+end
+$$;
+
+alter table public.savings_goals add column if not exists client_id uuid;
+update public.savings_goals set client_id = gen_random_uuid() where client_id is null;
+alter table public.savings_goals alter column client_id set default gen_random_uuid();
+alter table public.savings_goals alter column client_id set not null;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.savings_goals'::regclass
+      and conname = 'savings_goals_client_id_key'
+  ) then
+    alter table public.savings_goals
+      add constraint savings_goals_client_id_key unique (client_id);
+  end if;
+end
+$$;
 
 -- 2. Journal des opérations déjà appliquées (anti-double-rejeu).
 --    Pas de policy RLS : réservée à la fonction security definer.
-create table public.applied_ops (
+create table if not exists public.applied_ops (
   op_id uuid primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   applied_at timestamptz not null default now()
 );
+
 alter table public.applied_ops enable row level security;
 
 -- 3. Dépôt/retrait atomique et idempotent.

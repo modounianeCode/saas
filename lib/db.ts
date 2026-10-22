@@ -50,10 +50,28 @@ export async function kvSet(key: string, value: unknown): Promise<void> {
   }
 }
 
+export async function kvDelete(key: string): Promise<void> {
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(KV_STORE, "readwrite");
+      tx.objectStore(KV_STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    // Cache indisponible : rien à purger.
+  }
+}
+
 export type OutboxOp = {
   id?: number;
   type: string;
   payload: Record<string, unknown>;
+  /** Propriétaire de l'opération. Les opérations mises en file avant cette
+   *  version n'en ont pas : elles sont alors considérées comme appartenant
+   *  à l'utilisateur connecté (compatibilité). */
+  userId?: string;
   createdAt: number;
 };
 
@@ -99,16 +117,10 @@ export async function outboxRemove(id: number): Promise<void> {
   }
 }
 
-export async function outboxCount(): Promise<number> {
-  try {
-    const db = await openDb();
-    return await new Promise<number>((resolve, reject) => {
-      const tx = db.transaction(OUTBOX_STORE, "readonly");
-      const req = tx.objectStore(OUTBOX_STORE).count();
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  } catch {
-    return 0;
-  }
+export async function outboxCount(userId?: string | null): Promise<number> {
+  const ops = await outboxAll();
+  if (!userId) return ops.length;
+  // Les opérations antérieures (sans userId) sont attribuées à l'utilisateur
+  // courant, comme lors du rejeu.
+  return ops.filter(op => !op.userId || op.userId === userId).length;
 }

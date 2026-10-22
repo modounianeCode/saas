@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Installer et compiler
+    name: Lint, types, audit et build
     runs-on: ubuntu-latest
     env:
       # Valeurs factices : elles permettent seulement de compiler le client.
@@ -25,5 +25,11 @@ jobs:
           cache: npm
       - name: Installer les dependances
         run: npm ci
+      - name: Verifier les types
+        run: npm run typecheck
+      - name: Linter
+        run: npm run lint
+      - name: Auditer les dependances de production
+        run: npm run audit
       - name: Compiler l'application
         run: npm run build

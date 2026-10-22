@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./supabase";
-import { cacheGet, cacheSet } from "./offlineSync";
+import { cacheGet, cacheSet, purgeUserCache } from "./offlineSync";
 
 const SESSION_KEY = "session_user";
+
+/** Signale aux autres modules (OfflineProvider) que l'identité locale est
+ *  disponible : ils peuvent alors rejouer la file d'attente. */
+function notifySessionReady() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("app:session-ready"));
+}
 
 export function useAuth() {
   const client = supabase();
@@ -23,6 +29,7 @@ export function useAuth() {
           const name = data.user.user_metadata?.full_name ?? null;
           setFullName(name);
           await cacheSet(SESSION_KEY, { id: data.user.id, full_name: name });
+          notifySessionReady();
           return;
         }
       } catch {
@@ -30,7 +37,10 @@ export function useAuth() {
       }
       const cached = await cacheGet<{ id?: string; full_name?: string | null }>(SESSION_KEY);
       if (!cancelled) {
-        if (cached?.id) setUserId(cached.id);
+        if (cached?.id) {
+          setUserId(cached.id);
+          notifySessionReady();
+        }
         setFullName(cached?.full_name ?? null);
       }
     }
@@ -43,6 +53,7 @@ export function useAuth() {
       const name = session?.user.user_metadata?.full_name ?? null;
       setFullName(name);
       void cacheSet(SESSION_KEY, id ? { id, full_name: name } : null);
+      if (id) notifySessionReady();
     });
 
     return () => {
@@ -51,5 +62,17 @@ export function useAuth() {
     };
   }, [client]);
 
-  return { client, userId, fullName };
+  const signOut = useCallback(async () => {
+    try {
+      await client.auth.signOut();
+    } catch {
+      // Hors ligne : supabase-js efface quand même la session locale.
+    }
+    await cacheSet(SESSION_KEY, null);
+    if (userId) await purgeUserCache(userId);
+    setUserId(null);
+    setFullName(null);
+  }, [client, userId]);
+
+  return { client, userId, fullName, signOut };
 }

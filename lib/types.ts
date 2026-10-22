@@ -10,6 +10,7 @@ export type Transaction = {
   amount: number;
   category: string;
   occurred_on: string;
+  created_at?: string;
 };
 
 export type TransactionInput = {
@@ -44,6 +45,15 @@ export const incomeCategories = ["Salaire", "Vente", "Cadeau", "Autres"];
 
 export const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
 
+/** Date du jour (AAAA-MM-JJ) dans le fuseau local, pas en UTC : à 00 h 30
+ *  à Dakar comme à Douala, `toISOString()` renverrait la veille. */
 export function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+}
+
+/** Mois courant (AAAA-MM) dans le fuseau local. */
+export function currentMonth(): string {
+  return today().slice(0, 7);
 }

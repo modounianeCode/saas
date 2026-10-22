@@ -38,7 +38,7 @@ export default function SavingsGoalForm({ onCreate }: Props) {
         onChange={e => setTarget(e.target.value)}
         required
       />
-      <button>Créer l'objectif</button>
+      <button>Créer l’objectif</button>
       {error && <p className="form-error">{error}</p>}
     </form>
   );

@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { useTransactions } from "@/lib/useTransactions";
-import type { TransactionInput } from "@/lib/types";
+import { currentMonth, type TransactionInput } from "@/lib/types";
 import Summary from "./Summary";
 import TransactionForm from "./TransactionForm";
 import TransactionList from "./TransactionList";
@@ -12,28 +12,52 @@ import SavingsGoals from "./SavingsGoals";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { client, userId, fullName } = useAuth();
-  const { transactions, openingBalance, add, remove, saveOpeningBalance } = useTransactions(client, userId ?? "");
+  const { client, userId, fullName, signOut } = useAuth();
+  const { transactions, openingBalance, add, remove, saveOpeningBalance } = useTransactions(client, userId);
 
-  const month = useMemo(() => {
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    const currentMonth = startOfMonth.toISOString().slice(0, 7);
-    return currentMonth;
-  }, []);
+  const month = useMemo(() => currentMonth(), []);
+  const [balanceDraft, setBalanceDraft] = useState("");
+  const [balanceError, setBalanceError] = useState<string | null>(null);
+
+  // Le champ est contrôlé : à l'arrivée des données serveur (ou du cache),
+  // il reflète la vraie valeur au lieu de rester bloqué sur 0.
+  useEffect(() => {
+    setBalanceDraft(String(openingBalance));
+  }, [openingBalance]);
 
   const thisMonth = transactions.filter(t => t.occurred_on.startsWith(month));
   const income = thisMonth.filter(t => t.type === "income").reduce((sum, t) => sum + Number(t.amount), 0);
   const expenses = thisMonth.filter(t => t.type === "expense").reduce((sum, t) => sum + Number(t.amount), 0);
   const balance = openingBalance + transactions.reduce((sum, t) => sum + (t.type === "income" ? Number(t.amount) : -Number(t.amount)), 0);
 
-  if (!userId) return null;
+  if (!userId) {
+    return (
+      <main className="app-shell state-screen">
+        <p>Chargement de votre espace…</p>
+      </main>
+    );
+  }
+
+  async function commitOpeningBalance() {
+    const error = await saveOpeningBalance(balanceDraft);
+    if (error) {
+      setBalanceError(error);
+      setBalanceDraft(String(openingBalance));
+      return;
+    }
+    setBalanceError(null);
+  }
 
   return (
     <main className="app-shell">
       <header>
         <div className="brand"><span>✦</span> Argent Clair</div>
-        <button className="logout" onClick={() => client.auth.signOut().then(() => router.push("/login"))}>Déconnexion</button>
+        <button
+          className="logout"
+          onClick={() => { void signOut().then(() => router.push("/login")); }}
+        >
+          Déconnexion
+        </button>
       </header>
 
       <section className="welcome">
@@ -45,9 +69,14 @@ export default function Dashboard() {
           Solde initial
           <input
             type="number"
-            defaultValue={openingBalance}
-            onBlur={e => saveOpeningBalance(e.target.value)}
+            min="0"
+            step="1"
+            value={balanceDraft}
+            onChange={e => setBalanceDraft(e.target.value)}
+            onBlur={() => { void commitOpeningBalance(); }}
+            onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
           />
+          {balanceError && <span className="form-error">{balanceError}</span>}
         </label>
       </section>
 

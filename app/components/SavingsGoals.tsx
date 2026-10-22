@@ -18,7 +18,7 @@ export default function SavingsGoals({ client, userId }: Props) {
   return (
     <section className="savings-section">
       <div className="savings-header">
-        <h2>Mes objectifs d'épargne</h2>
+        <h2>Mes objectifs d’épargne</h2>
         <span className="savings-total">Total épargné : <b>{money.format(totalSaved)}</b></span>
       </div>
 
@@ -28,7 +28,7 @@ export default function SavingsGoals({ client, userId }: Props) {
       </div>
 
       {goals.length === 0 ? (
-        <p className="empty">Créez votre premier objectif d'épargne pour commencer.</p>
+        <p className="empty">Créez votre premier objectif d’épargne pour commencer.</p>
       ) : (
         <div className="savings-grid">
           {goals.map(goal => (
